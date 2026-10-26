@@ -10,17 +10,18 @@ import { Art } from "./tour-art";
 /* state                                                               */
 /* ------------------------------------------------------------------ */
 interface Seen { welcomed: boolean; pages: Record<string, true>; mute: boolean }
-const KEY = "books360.tour.v1";
+import { currentUserId } from "@/lib/store";
+const keyFor = () => `books360.tour.v2.${currentUserId()}`;
 const readSeen = (): Seen => {
   try {
-    return { welcomed: false, pages: {}, mute: false, ...(JSON.parse(localStorage.getItem(KEY) || "{}") as Partial<Seen>) };
+    return { welcomed: false, pages: {}, mute: false, ...(JSON.parse(localStorage.getItem(keyFor()) || "{}") as Partial<Seen>) };
   } catch {
     return { welcomed: false, pages: {}, mute: false };
   }
 };
 const writeSeen = (s: Seen) => {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(keyFor(), JSON.stringify(s));
   } catch {
     /* storage unavailable: tour simply shows again next time */
   }

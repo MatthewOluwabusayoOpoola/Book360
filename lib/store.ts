@@ -1,6 +1,5 @@
 "use client";
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
 import {
   addManualEntry,
   postDoc,
@@ -18,7 +17,6 @@ import type { Account, Books, Category, Contact, Discount, Doc, JournalLine, Map
 
 interface State {
   books: Books;
-  hydrated: boolean;
   /* generic */
   loadDemo: () => void;
   startBlank: () => void;
@@ -52,9 +50,7 @@ const upsert = <T extends { id: string }>(list: T[], item: Omit<T, "id"> & { id?
   return [...list, { ...item, id: item.id ?? uid(prefix) } as T];
 };
 
-export const useBooks = create<State>()(
-  persist(
-    (set, get) => {
+export const useBooks = create<State>()((set, get) => {
       const apply = (r: Result) => {
         if (r.ok) set({ books: r.books });
         return r;
@@ -62,15 +58,8 @@ export const useBooks = create<State>()(
       const patch = (f: (b: Books) => Partial<Books>) => set((s) => ({ books: { ...s.books, ...f(s.books) } }));
       return {
         books: emptyBooks(),
-        hydrated: false,
-        loadDemo: () => {
-          try { localStorage.removeItem("books360.blank"); } catch {}
-          set({ books: demoBooks() });
-        },
-        startBlank: () => {
-          try { localStorage.setItem("books360.blank", "1"); } catch {}
-          set({ books: emptyBooks() });
-        },
+        loadDemo: () => set({ books: demoBooks() }),
+        startBlank: () => set({ books: emptyBooks() }),
         importBooks: (b) => set({ books: b }),
         updateSettings: (s) => patch((b) => ({ settings: { ...b.settings, ...s } })),
 
@@ -123,19 +112,63 @@ export const useBooks = create<State>()(
         voidDocument: (id) => apply(voidDoc(get().books, id)),
         addJournal: (e) => apply(addManualEntry(get().books, e)),
       };
-    },
-    {
-      name: "books360.v1",
-      version: 1,
-      storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ books: s.books }),
-      skipHydration: true,
-      onRehydrateStorage: () => (state, err) => {
-        // first visit: nothing stored yet → start with demo data so every screen has something to show
-        if (!err && state && state.books.journal.length === 0 && state.books.docs.length === 0 && !localStorage.getItem("books360.blank")) {
-          state.loadDemo();
-        }
-      },
-    },
-  ),
-);
+});
+
+/* ------------------------------------------------------------------ */
+/* per-user persistence                                                */
+/* ------------------------------------------------------------------ */
+const keyFor = (uid: string) => `books360.v2.${uid}`;
+const LEGACY_KEY = "books360.v1"; // single-user data saved before sign-in existed
+let activeUid: string | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
+
+export const currentUserId = () => activeUid ?? "anon";
+
+function save() {
+  if (!activeUid) return;
+  try {
+    localStorage.setItem(keyFor(activeUid), JSON.stringify({ books: useBooks.getState().books }));
+  } catch {
+    /* storage full or unavailable: the books stay in memory for this session */
+  }
+}
+
+/** Load (or create) the books that belong to this signed-in user, then start saving them. */
+export function activateUser(uid: string): void {
+  if (timer) clearTimeout(timer);
+  save(); // flush the previous user's pending changes first
+  activeUid = null; // pause saving while we swap data
+  let books: Books | null = null;
+  try {
+    const raw = localStorage.getItem(keyFor(uid));
+    if (raw) books = (JSON.parse(raw) as { books?: Books }).books ?? null;
+    if (!books) {
+      // first sign-in on this browser: adopt data from before accounts existed
+      const legacy = localStorage.getItem(LEGACY_KEY);
+      if (legacy) {
+        books = (JSON.parse(legacy) as { state?: { books?: Books } }).state?.books ?? null;
+        if (books) localStorage.removeItem(LEGACY_KEY);
+      }
+    }
+  } catch {
+    books = null;
+  }
+  useBooks.setState({ books: books ?? demoBooks() });
+  activeUid = uid;
+  save();
+}
+
+export function deactivateUser(): void {
+  save();
+  activeUid = null;
+  useBooks.setState({ books: emptyBooks() });
+}
+
+if (typeof window !== "undefined") {
+  useBooks.subscribe((s, prev) => {
+    if (!activeUid || s.books === prev.books) return;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(save, 150);
+  });
+  window.addEventListener("pagehide", () => save());
+}

@@ -86,10 +86,10 @@ export const SEED_CONTACTS: Contact[] = [
 export function emptyBooks(): Books {
   return {
     settings: {
-      companyName: "Òpòweb Studio",
+      companyName: "My company",
       currency: "NGN",
       locale: "en-NG",
-      userName: "Matthew",
+      userName: "",
       invoicePrefix: "INV",
       billPrefix: "BILL",
     },

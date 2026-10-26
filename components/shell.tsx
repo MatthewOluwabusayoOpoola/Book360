@@ -3,7 +3,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Bell, Database, FileText, Home, PieChart, Plus, Receipt, Search, Settings, Sparkles, Users, Zap, Percent, BookOpen, AlertTriangle } from "lucide-react";
-import { useBooks } from "@/lib/store";
+import { UserButton, useAuth, useUser } from "@clerk/nextjs";
+import { activateUser, deactivateUser, useBooks } from "@/lib/store";
 import { mappingIssues, balanceDue, todayISO, MAPPING_META } from "@/lib/engine";
 import { Toaster } from "./ui";
 import { HelpMenu, TourLayer } from "./tour";
@@ -88,7 +89,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {/* top bar */}
       <header className="glass no-print relative z-40 mx-auto flex h-14 max-w-[1280px] items-center gap-3 rounded-full px-2.5 sm:h-[58px]">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-ink text-[15px] font-semibold text-white">{books.settings.userName.slice(0, 1).toUpperCase()}</span>
+          <UserButton appearance={{ elements: { avatarBox: { width: 40, height: 40 } } }} />
           <span className="hidden truncate text-[15px] font-semibold sm:block">Welcome, {books.settings.userName}</span>
         </div>
 
@@ -210,11 +211,29 @@ export function Shell({ children }: { children: ReactNode }) {
 }
 
 export function BooksGate({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(false);
+  const { isLoaded, userId } = useAuth();
+  const { user } = useUser();
+  const [readyFor, setReadyFor] = useState<string | null>(null);
+
   useEffect(() => {
-    Promise.resolve(useBooks.persist.rehydrate()).finally(() => setReady(true));
-  }, []);
-  if (!ready)
+    if (!isLoaded) return;
+    if (!userId) {
+      deactivateUser();
+      setReadyFor(null);
+      return;
+    }
+    activateUser(userId);
+    setReadyFor(userId);
+  }, [isLoaded, userId]);
+
+  // greet people by their own name until they set one in Settings
+  useEffect(() => {
+    if (readyFor && user && !useBooks.getState().books.settings.userName) {
+      useBooks.getState().updateSettings({ userName: user.firstName || user.username || "there" });
+    }
+  }, [readyFor, user]);
+
+  if (!isLoaded || !userId || readyFor !== userId)
     return (
       <div className="grid min-h-dvh place-items-center">
         <div className="glass flex items-center gap-3 rounded-full px-5 py-3 text-sm font-medium">

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,13 +10,15 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="antialiased">
-        <div className="scene" aria-hidden>
-          <i /><i /><i /><i /><i />
-        </div>
-        {children}
-      </body>
-    </html>
+    <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" signInFallbackRedirectUrl="/" signUpFallbackRedirectUrl="/" afterSignOutUrl="/sign-in">
+      <html lang="en">
+        <body className="antialiased">
+          <div className="scene" aria-hidden>
+            <i /><i /><i /><i /><i />
+          </div>
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
