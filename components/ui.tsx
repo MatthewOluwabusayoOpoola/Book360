@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { create } from "zustand";
 import { X, Check, AlertCircle } from "lucide-react";
 import type { DocStatus } from "@/lib/types";
@@ -188,16 +189,19 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
     document.addEventListener("keydown", onKey);
     setTimeout(() => ref.current?.querySelector<HTMLElement>("input, select, textarea")?.focus(), 30);
     document.body.style.overflow = "hidden";
+    document.body.classList.add("modal-open");
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      document.body.classList.remove("modal-open");
       prev?.focus();
     };
   }, [open, onClose]);
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-[#2a1d12]/35 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className={`glass pop-in flex max-h-[90dvh] w-full flex-col rounded-[30px] bg-white/70 ${wide ? "max-w-3xl" : "max-w-lg"}`} style={{ background: "rgba(250,246,241,.86)" }}>
+  if (!open || typeof document === "undefined") return null;
+  return createPortal(
+    <div className="modal-backdrop fixed inset-0 z-[70] overflow-x-hidden overflow-y-auto rounded-[40px] bg-[#2a1d12]/35" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="pointer-events-none flex min-h-full items-center justify-center p-4">
+      <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className={`glass pop-in pointer-events-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-[30px] bg-white/70 ${wide ? "max-w-3xl" : "max-w-lg"}`} style={{ background: "rgba(250,246,241,.86)" }}>
         <header className="flex items-center justify-between px-6 pb-2 pt-5">
           <h2 className="text-lg font-semibold tracking-[-0.02em]">{title}</h2>
           <button onClick={onClose} aria-label="Close" className="grid h-9 w-9 place-items-center rounded-full bg-black/5 hover:bg-black/10">
@@ -207,7 +211,9 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
         <div className="scroll-thin flex-1 overflow-y-auto px-6 py-3">{children}</div>
         {footer && <footer className="flex flex-wrap justify-end gap-2.5 px-6 pb-5 pt-3">{footer}</footer>}
       </div>
-    </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

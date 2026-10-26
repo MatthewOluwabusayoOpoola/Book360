@@ -57,6 +57,22 @@ body {
 }
 .sheet { border-radius: 40px; min-width: 0; }
 .card { border-radius: 28px; min-width: 0; }
+body.modal-open .glass.card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+body.modal-open .glass.card::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(42, 29, 18, 0.12);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  pointer-events: none;
+}
 .tile { border-radius: 22px; background: rgba(255, 255, 255, 0.58); border: 1px solid rgba(255, 255, 255, 0.7); }
 .tile-flat { border-radius: 16px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.6); }
 

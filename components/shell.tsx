@@ -6,6 +6,7 @@ import { Bell, Database, FileText, Home, PieChart, Plus, Receipt, Search, Settin
 import { UserButton, useAuth, useUser } from "@clerk/nextjs";
 import { activateUser, deactivateUser, useBooks } from "@/lib/store";
 import { mappingIssues, balanceDue, todayISO, MAPPING_META } from "@/lib/engine";
+import { searchBooks } from "@/lib/search";
 import { Toaster } from "./ui";
 import { HelpMenu, TourLayer } from "./tour";
 
@@ -50,25 +51,19 @@ export function Shell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const quick = usePopover();
   const bell = usePopover();
+  const resultList = useRef<HTMLDivElement>(null);
   const [q, setQ] = useState("");
   const [focus, setFocus] = useState(false);
   const [hi, setHi] = useState(0);
 
   const results = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    if (!t) return [];
-    const out: { label: string; sub: string; href: string }[] = [];
-    const contact = new Map(books.contacts.map((c) => [c.id, c.name]));
-    NAV.forEach((n) => n.label.toLowerCase().includes(t) && out.push({ label: n.label, sub: "Page", href: n.href }));
-    books.docs.forEach((d) => {
-      const name = contact.get(d.contactId) ?? "";
-      if (d.number.toLowerCase().includes(t) || name.toLowerCase().includes(t))
-        out.push({ label: `${d.number} · ${name || "No contact"}`, sub: d.type === "invoice" ? "Invoice" : "Bill", href: `/activity/${d.id}` });
-    });
-    books.accounts.forEach((a) => (a.name.toLowerCase().includes(t) || a.code.includes(t)) && out.push({ label: `${a.code} ${a.name}`, sub: "Account", href: `/journal?account=${a.id}` }));
-    books.contacts.forEach((c) => c.name.toLowerCase().includes(t) && out.push({ label: c.name, sub: "Contact", href: "/contacts" }));
-    return out.slice(0, 7);
+    return searchBooks(q, books, NAV);
   }, [q, books]);
+
+  useEffect(() => {
+    if (!focus) return;
+    resultList.current?.querySelectorAll<HTMLElement>('[role="option"]')[hi]?.scrollIntoView({ block: "nearest" });
+  }, [focus, hi, results]);
 
   const alerts = useMemo(() => {
     const today = todayISO();
@@ -121,10 +116,10 @@ export function Shell({ children }: { children: ReactNode }) {
             />
           </div>
           {focus && q.trim() && (
-            <div className="glass pop-in absolute left-0 right-0 top-12 overflow-hidden rounded-3xl p-1.5" style={{ background: "rgba(250,246,241,.92)" }} role="listbox">
+            <div ref={resultList} className="glass pop-in absolute left-0 right-0 top-12 max-h-[min(70vh,32rem)] overflow-y-auto rounded-3xl p-1.5" style={{ background: "rgba(250,246,241,.92)" }} role="listbox">
               {results.length === 0 && <p className="muted px-3 py-3 text-sm">No match for “{q}”.</p>}
               {results.map((r, i) => (
-                <Link key={r.href + r.label} href={r.href} onClick={() => setQ("")} role="option" aria-selected={i === hi} className={`flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-sm ${i === hi ? "bg-white" : "hover:bg-white/60"}`}>
+                <Link key={r.href + r.label} href={r.href} onMouseDown={(e) => e.preventDefault()} onClick={() => setQ("")} role="option" aria-selected={i === hi} className={`flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-sm ${i === hi ? "bg-white" : "hover:bg-white/60"}`}>
                   <span className="truncate">{r.label}</span>
                   <span className="muted flex-none text-xs">{r.sub}</span>
                 </Link>
